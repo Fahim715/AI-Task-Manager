@@ -17,10 +17,18 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/taskdb
-      GROQ_API_KEY: your_groq_api_key_here   # <-- Replace this
+      DATABASE_URL: postgresql+asyncpg://user:password@db:5432/taskdb
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: your-jwt-secret-key
+      OPENAI_API_KEY: your-openai-key
+      FRONTEND_URL: http://localhost:3000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your@email.com
+      SMTP_PASSWORD: your-app-password
     depends_on:
       - db
+      - redis
 
   frontend:
     build: ./frontend
@@ -28,6 +36,45 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  celery_worker:
+    build: ./backend
+    command: celery -A celery_app worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db:5432/taskdb
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: your-jwt-secret-key
+      OPENAI_API_KEY: your-openai-key
+      FRONTEND_URL: http://localhost:3000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your@email.com
+      SMTP_PASSWORD: your-app-password
+    depends_on:
+      - db
+      - redis
+
+  celery_beat:
+    build: ./backend
+    command: celery -A celery_app beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db:5432/taskdb
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: your-jwt-secret-key
+      OPENAI_API_KEY: your-openai-key
+      FRONTEND_URL: http://localhost:3000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your@email.com
+      SMTP_PASSWORD: your-app-password
+    depends_on:
+      - db
+      - redis
 
 volumes:
   pg_data:

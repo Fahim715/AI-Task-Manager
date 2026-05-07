@@ -1,12 +1,23 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
-import asyncpg
-import os
-import httpx
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
 
-app = FastAPI(title="AI Task Manager")
+from routers.ai import router as ai_router
+from routers.auth import router as auth_router
+from routers.invoices import router as invoices_router
+from routers.tasks import router as tasks_router
+from routers.webhooks import router as webhooks_router
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
+app = FastAPI(title="TaskFlow AI")
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,91 +26,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/taskdb")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
-db_pool = None
-
-@app.on_event("startup")
-async def startup():
-    global db_pool
-    db_pool = await asyncpg.create_pool(DATABASE_URL)
-    await db_pool.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT,
-            done BOOLEAN DEFAULT FALSE
-        )
-    """)
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db_pool.close()
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"error": exc.detail, "code": exc.status_code})
 
 
-# --- Schemas ---
-class TaskIn(BaseModel):
-    title: str
-    description: Optional[str] = ""
-
-class TaskOut(TaskIn):
-    id: int
-    done: bool
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"error": "Validation error", "code": 422, "details": exc.errors()})
 
 
-# --- CRUD Routes ---
-@app.get("/tasks", response_model=List[TaskOut])
-async def get_tasks():
-    rows = await db_pool.fetch("SELECT * FROM tasks ORDER BY id DESC")
-    return [dict(r) for r in rows]
-
-@app.post("/tasks", response_model=TaskOut)
-async def create_task(task: TaskIn):
-    row = await db_pool.fetchrow(
-        "INSERT INTO tasks (title, description) VALUES ($1, $2) RETURNING *",
-        task.title, task.description
-    )
-    return dict(row)
-
-@app.patch("/tasks/{task_id}/done", response_model=TaskOut)
-async def mark_done(task_id: int):
-    row = await db_pool.fetchrow(
-        "UPDATE tasks SET done=TRUE WHERE id=$1 RETURNING *", task_id
-    )
-    if not row:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return dict(row)
-
-@app.delete("/tasks/{task_id}")
-async def delete_task(task_id: int):
-    await db_pool.execute("DELETE FROM tasks WHERE id=$1", task_id)
-    return {"message": "Deleted"}
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(_: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(status_code=429, content={"error": "Rate limit exceeded", "code": 429})
 
 
-# --- AI Summary Route ---
-@app.get("/summary")
-async def ai_summary():
-    rows = await db_pool.fetch("SELECT title, description, done FROM tasks")
-    if not rows:
-        return {"summary": "No tasks yet."}
+app.include_router(auth_router)
+app.include_router(tasks_router)
+app.include_router(invoices_router)
+app.include_router(webhooks_router)
+app.include_router(ai_router)
 
-    task_text = "\n".join(
-        [f"- {'[Done]' if r['done'] else '[Pending]'} {r['title']}: {r['description']}" for r in rows]
-    )
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-            json={
-                "model": "llama3-8b-8192",
-                "messages": [
-                    {"role": "system", "content": "You are a productivity assistant."},
-                    {"role": "user", "content": f"Summarize these tasks briefly:\n{task_text}"}
-                ],
-                "max_tokens": 200
-            }
-        )
-    data = resp.json()
-    return {"summary": data["choices"][0]["message"]["content"]}
+@app.get("/api/health", response_model=dict)
+async def health() -> dict:
+    return {"status": "ok"}
