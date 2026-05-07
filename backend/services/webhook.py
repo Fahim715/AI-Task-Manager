@@ -9,12 +9,14 @@ from models import WebhookConfig
 
 
 def sign_payload(secret: str, payload: dict) -> str:
+    """Return an HMAC-SHA256 signature for webhook payloads."""
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), raw, hashlib.sha256).hexdigest()
     return f"sha256={signature}"
 
 
 async def get_active_webhooks(db: AsyncSession, org_id: int, event: str) -> Iterable[WebhookConfig]:
+    """Fetch active webhooks that subscribe to a given event."""
     result = await db.execute(
         select(WebhookConfig).where(
             WebhookConfig.org_id == org_id,

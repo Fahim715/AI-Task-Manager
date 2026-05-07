@@ -18,26 +18,31 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    """Hash a plain-text password for storage."""
     return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plain-text password against its hash."""
     return pwd_context.verify(plain, hashed)
 
 
 def create_access_token(subject: str, org_id: int) -> str:
+    """Create a signed JWT access token."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": subject, "org_id": org_id, "exp": expire, "type": "access"}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def create_refresh_token(subject: str, org_id: int) -> str:
+    """Create a signed JWT refresh token."""
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {"sub": subject, "org_id": org_id, "exp": expire, "type": "refresh"}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def create_invite_token(email: str, org_id: int) -> str:
+    """Create a signed invite token for new users."""
     expire = datetime.now(timezone.utc) + timedelta(hours=INVITE_TOKEN_EXPIRE_HOURS)
     payload = {
         "email": email,
@@ -50,10 +55,12 @@ def create_invite_token(email: str, org_id: int) -> str:
 
 
 def decode_token(token: str) -> dict:
+    """Decode a JWT token and return its claims."""
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User | None:
+    """Authenticate user credentials and return a user when valid."""
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.hashed_password):
@@ -62,6 +69,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 
 
 async def create_org_and_user(db: AsyncSession, email: str, password: str, org_name: str) -> User:
+    """Create an organization and its first admin user."""
     base_slug = org_name.strip().lower().replace(" ", "-") or "org"
     slug = base_slug
     counter = 1
@@ -87,6 +95,7 @@ async def create_org_and_user(db: AsyncSession, email: str, password: str, org_n
 
 
 async def create_invited_user(db: AsyncSession, email: str, password: str, org_id: int) -> User:
+    """Create a user from an invite token."""
     user = User(
         email=email,
         hashed_password=hash_password(password),

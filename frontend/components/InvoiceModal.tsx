@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Invoice } from "../lib/types";
 
 interface InvoiceModalProps {
@@ -14,6 +14,13 @@ export function InvoiceModal({ open, initial, onClose, onSave }: InvoiceModalPro
   const [title, setTitle] = useState(initial?.title || "");
   const [amount, setAmount] = useState(initial?.amount?.toString() || "");
   const [currency, setCurrency] = useState(initial?.currency || "BDT");
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle(initial?.title || "");
+    setAmount(initial?.amount?.toString() || "");
+    setCurrency(initial?.currency || "BDT");
+  }, [open, initial]);
 
   if (!open) return null;
 

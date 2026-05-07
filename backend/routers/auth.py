@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import User
+from models import User, UserRole
 from schemas.auth import (
     AcceptInviteRequest,
     AuthResponse,
@@ -81,6 +81,8 @@ async def invite_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
+    if current_user.role != UserRole.admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     token = create_invite_token(payload.email, current_user.org_id)
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     invite_link = f"{frontend_url}/register?token={token}"

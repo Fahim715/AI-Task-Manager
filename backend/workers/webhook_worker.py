@@ -1,8 +1,8 @@
 import asyncio
 import httpx
-from celery import shared_task
 from sqlalchemy import select
 
+from celery_app import celery_app
 from database import AsyncSessionLocal
 from models import WebhookConfig, WebhookLog
 from services.webhook import sign_payload
@@ -41,7 +41,7 @@ async def _deliver_webhook(webhook_config_id: int, event: str, payload: dict) ->
         await session.commit()
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5)
 def deliver_webhook(self, org_id: int, event: str, payload: dict) -> None:
     try:
         asyncio.run(_deliver_for_org(org_id, event, payload))

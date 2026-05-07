@@ -1,8 +1,8 @@
 import asyncio
 from datetime import datetime, timezone
-from celery import shared_task
 from sqlalchemy import select
 
+from celery_app import celery_app
 from database import AsyncSessionLocal
 from models import Task
 
@@ -21,6 +21,6 @@ async def _mark_overdue() -> int:
         return count
 
 
-@shared_task
+@celery_app.task
 def daily_overdue_check() -> int:
     return asyncio.run(_mark_overdue())

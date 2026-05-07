@@ -1,15 +1,17 @@
 import asyncio
+import os
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
 
-from database import Base
-from main import app
-from database import get_db
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
 
-
-TEST_DATABASE_URL = "sqlite+aiosqlite://"
+from database import Base  # noqa: E402
+import models  # noqa: F401,E402
+from main import app  # noqa: E402
+from database import get_db  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -24,7 +26,6 @@ async def engine():
     engine = create_async_engine(
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
     )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

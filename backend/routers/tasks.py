@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Task, TaskStatus
+from models import Task, TaskStatus, User
 from routers.deps import get_current_user
 from schemas.task import TaskCreate, TaskOut, TaskUpdate
 from workers.webhook_worker import deliver_webhook
@@ -40,6 +40,13 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> TaskOut:
+    if payload.assignee_id:
+        assignee = await db.execute(
+            select(User).where(User.id == payload.assignee_id, User.org_id == current_user.org_id)
+        )
+        if not assignee.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Invalid assignee")
+
     task = Task(
         title=payload.title,
         description=payload.description,
@@ -84,7 +91,15 @@ async def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("assignee_id"):
+        assignee = await db.execute(
+            select(User).where(User.id == updates["assignee_id"], User.org_id == current_user.org_id)
+        )
+        if not assignee.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Invalid assignee")
+
+    for field, value in updates.items():
         setattr(task, field, value)
 
     await db.commit()

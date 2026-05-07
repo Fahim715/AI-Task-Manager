@@ -13,9 +13,12 @@ export function Navbar() {
         <Link href="/dashboard/webhooks">Webhooks</Link>
         <Link href="/dashboard/settings">Settings</Link>
       </nav>
-      <form action="/api/auth/logout" method="POST">
-        <button className="px-4 py-2 rounded-full bg-ink text-white">Log out</button>
-      </form>
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-500">Org: Demo</span>
+        <form action="/api/auth/logout" method="POST">
+          <button className="px-4 py-2 rounded-full bg-ink text-white">Log out</button>
+        </form>
+      </div>
     </header>
   );
 }

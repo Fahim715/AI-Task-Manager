@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const isProd = process.env.NODE_ENV === "production";
 
 export async function POST(request: Request) {
   const payload = await request.json();
@@ -20,11 +21,13 @@ export async function POST(request: Request) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: isProd,
   });
   response.cookies.set("refresh_token", data.tokens.refresh_token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: isProd,
   });
   return response;
 }

@@ -17,6 +17,8 @@ celery_app = Celery(
 )
 
 celery_app.conf.timezone = TIMEZONE
+celery_app.conf.task_always_eager = os.getenv("CELERY_ALWAYS_EAGER", "false") == "true"
+celery_app.conf.task_eager_propagates = True
 celery_app.conf.beat_schedule = {
     "daily-overdue-check": {
         "task": "workers.overdue_worker.daily_overdue_check",

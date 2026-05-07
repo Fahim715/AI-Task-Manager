@@ -11,6 +11,7 @@ SMTP_SENDER = os.getenv("SMTP_SENDER", SMTP_USER)
 
 
 def _ensure_configured() -> None:
+    """Validate SMTP configuration is present."""
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
         raise RuntimeError("SMTP not configured")
 

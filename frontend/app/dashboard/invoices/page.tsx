@@ -8,6 +8,7 @@ import type { Invoice } from "../../../lib/types";
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Invoice | null>(null);
 
   const load = async () => {
     const data = await api.listInvoices();
@@ -19,15 +20,26 @@ export default function InvoicesPage() {
   }, []);
 
   const handleSave = async (payload: Partial<Invoice>) => {
-    await api.createInvoice(payload);
+    if (editing) {
+      await api.updateInvoice(editing.id, payload);
+    } else {
+      await api.createInvoice(payload);
+    }
     await load();
+    setEditing(null);
   };
 
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-display font-semibold">Invoices</h1>
-        <button className="px-4 py-2 rounded-full bg-ink text-white" onClick={() => setOpen(true)}>
+        <button
+          className="px-4 py-2 rounded-full bg-ink text-white"
+          onClick={() => {
+            setEditing(null);
+            setOpen(true);
+          }}
+        >
           New invoice
         </button>
       </div>
@@ -39,6 +51,7 @@ export default function InvoicesPage() {
               <th className="p-3">Title</th>
               <th className="p-3">Amount</th>
               <th className="p-3">Status</th>
+              <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -53,13 +66,29 @@ export default function InvoicesPage() {
                     {invoice.status}
                   </span>
                 </td>
+                <td className="p-3 text-right">
+                  <button
+                    className="text-sm text-slate-600"
+                    onClick={() => {
+                      setEditing(invoice);
+                      setOpen(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <InvoiceModal open={open} onClose={() => setOpen(false)} onSave={handleSave} />
+      <InvoiceModal
+        open={open}
+        initial={editing || undefined}
+        onClose={() => setOpen(false)}
+        onSave={handleSave}
+      />
     </section>
   );
 }

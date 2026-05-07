@@ -20,7 +20,12 @@ TaskFlow AI is a production-ready, multi-tenant SaaS for AI-powered task and inv
    ```bash
    docker-compose up --build
    ```
-3. Open:
+3. Run migrations and seed (in a new terminal):
+   ```bash
+   docker-compose exec backend alembic upgrade head
+   docker-compose exec backend python seed.py
+   ```
+4. Open:
    - Frontend: http://localhost:3000
    - Backend: http://localhost:8000
 

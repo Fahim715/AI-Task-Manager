@@ -1,8 +1,8 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from celery import shared_task
 from sqlalchemy import select
 
+from celery_app import celery_app
 from database import AsyncSessionLocal
 from models import Invoice, Organization, Task, TaskStatus, User, UserRole
 from services.email import send_email
@@ -49,6 +49,6 @@ async def _send_digest() -> int:
         return count
 
 
-@shared_task
+@celery_app.task
 def weekly_digest() -> int:
     return asyncio.run(_send_digest())

@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Invoice, InvoiceStatus
+from models import Invoice, InvoiceStatus, Task
 from routers.deps import get_current_user
 from schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 from workers.webhook_worker import deliver_webhook
@@ -34,6 +34,13 @@ async def create_invoice(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> InvoiceOut:
+    if payload.task_id:
+        task_result = await db.execute(
+            select(Task).where(Task.id == payload.task_id, Task.org_id == current_user.org_id)
+        )
+        if not task_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Invalid task reference")
+
     invoice = Invoice(
         title=payload.title,
         amount=payload.amount,
@@ -61,7 +68,15 @@ async def update_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("task_id"):
+        task_result = await db.execute(
+            select(Task).where(Task.id == updates["task_id"], Task.org_id == current_user.org_id)
+        )
+        if not task_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Invalid task reference")
+
+    for field, value in updates.items():
         setattr(invoice, field, value)
 
     await db.commit()
